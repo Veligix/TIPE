@@ -27,7 +27,7 @@ Beta:
 		Ordre dans le calcul, les plus proches de la sortie d'abord  
 		Tentative de restreindre les disques qui appliquent une force sur celui 	  	
     		considéré, en limitant à 2: les 2 devant qui ont déjà été calculés  
-		intuitivement, ceux derrière seraient négligeables car appliqueraient  
+		intuitivement,ceux derrière seraient négligeables car appliqueraient  
 		une force moindre. Puis moyenne des directions pour obtenir la nouvelle direction  
 	1.2.x:  
 		Calcul des contraintes en prenant en compte la chaîne entière des  
