@@ -11,7 +11,7 @@ Beta:
 		Fonction qui détermine le voisinage indirect d'un disque donné
 		(Sert dans 1.0, mais est dans beta car pas de mouvement,
 		contient le mouvement de beta3 et cette fonction)
-
+		
 0.x:
 	Début du TIPE
 	Version simple:
