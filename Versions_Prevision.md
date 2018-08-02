@@ -1,8 +1,9 @@
 NE SONT AFFICHÉES QUE LES MODIFICATIONS
 
 Alpha:  
-    Tests avec 2 disques
-  
++
+Tests avec 2 disques
++ 
 Beta:  
 ........Plus de 2 corps  
 ........Beta3:  
