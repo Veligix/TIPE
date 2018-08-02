@@ -1,0 +1,460 @@
+from tkinter import *
+from math import pi,cos,sin,sqrt
+from threading import Thread
+from random import randint
+from copy import deepcopy
+
+
+running = True
+
+fen = Tk()
+fen.geometry("1200x900")
+fen["bg"]="red"
+
+canvas = Canvas(fen,width="1200",height="900",background="white")
+canvas.place(x=0,y=0)
+
+canvas.create_line(100,200,1100,200,width=5)    
+canvas.create_line(1100,200,1100,700,width=5)    
+canvas.create_line(1100,700,100,700,width=5)    
+canvas.create_line(100,700,100,500,width=5)    
+canvas.create_line(100,200,100,400,width=5) 
+
+#point à atteindre
+xt,yt=100,450
+l={}   #dictionnaire contenant toutes les informations
+rayon=20    #rayon de base d'un disque
+moves={}
+
+pos=[]
+c=0
+while 1:
+    c+=1
+    x,y = randint(100+rayon,1100-rayon),randint(200+rayon,700-rayon)
+    test = True
+    for i in pos:
+        if sqrt((x-i[0])**2+(y-i[1])**2)<2*rayon:
+            test=False
+    if test:
+        c=0
+        pos.append((x,y))
+    if c==10:
+        break
+    
+n=len(pos)
+
+def create_point(xa,ya,col):
+    """Fonction pour placer un disque de couleur 'col' à la coordonnée (xa,ya)"""
+    disque = canvas.create_oval(xa-(rayon),ya-(rayon),xa+(rayon),ya+(rayon),fill="white",outline=col)
+    return disque
+
+def create_mark(xa,ya,col):
+    """Fonction pour placer un petit marquer de couleur 'col' à la coordonnée (xa,ya)"""
+    disque = canvas.create_oval(xa-2,ya-2,xa+2,ya+2,fill=col,outline=col)
+    return disque
+
+
+"""Création du quadrillage                              |   |  <- Pixels inclus           
+On a un rectangle noir de 1000x500                      | O |      
+on veut créer un quadrillage avec cases de coté 4*r     |   |  <- Pixels exclus
+Un quadrillage est représenté par un couple de coordonnés (x,y)
+tel que x,y soit le point en haut à gauche du quadrillage
+"""
+cote = 4*rayon
+nbr_cases_x = int(999/cote)   #Si on est censé avoir PILE le nombre de case pour rentrer parfaitement,
+                              #on enlève la dernière et on la rajoute après dans la boucle,
+                              #sinon, on aura une case plus petite que prévu, mais jamais une case trop grande
+nbr_cases_y = int(499/cote)
+cases = {}   #Dictionnaire cases:  {(x_coin,y_coin):[liste des disques dont\
+                                   # le centre est dans la case],...}
+distances = {}  
+for i in range(nbr_cases_x+1):
+    for j in range(nbr_cases_y+1):
+        cases[i*cote+100,j*cote+200] = []                   
+
+
+def id_case(x,y):
+    """Prend un couple de coordonnées (x,y) et retourne le couple (a,b)
+    tel que le point représenté par (x,y) soit dans la case de coin
+    haut-gauche de coordonnés (a,b)"""
+    try:
+        assert (100<x<1100 and 200<y<700)
+        a=int((x-100)/cote)*cote+100
+        b=int((y-200)/cote)*cote+200
+        return (a,b)
+    except AssertionError:
+        raise ValueError
+        print(x,y)
+        print("Le couple à identifier n'est pas dans le rectangle")
+
+def add_list(ens,liste):
+    return ens.__or__(set(liste))
+
+
+
+def C(v):
+    """Fonction qui renvoie les disques qui le touchent directement
+    Prend en argument un disque
+    Retourne l'ensemble des disques à son contact / ensemble vide si aucun"""
+    to_return = set()
+    x,y = l[v][0],l[v][1]
+    a,b = id_case(x,y)   #on récupère la case où se trouve le disque qu'on test
+    voisinage = set(cases[a,b])  #on récupère la liste du voisinage (pas forcément contact)
+    #4         On imagine un disque à la case 4
+    #012
+    #345       Donc on regarde dans tous les cases de 0 à 9
+    #678    
+    if a>100: #On n'est pas sur les cases tout à gauche
+        voisinage = add_list(voisinage,cases[a-4*rayon,b])  #3
+        if b>200:
+            voisinage = add_list(voisinage,cases[a-4*rayon,b-4*rayon]) #0
+            voisinage = add_list(voisinage,cases[a,b-4*rayon]) #1
+        if b<600:
+            voisinage = add_list(voisinage,cases[a-4*rayon,b+4*rayon])  #6
+            voisinage = add_list(voisinage,cases[a,b+4*rayon])  #7
+    if a<1100-4*rayon: #Pas tout à droite
+        voisinage = add_list(voisinage,cases[a+4*rayon,b]) #5
+        if b>200:
+            voisinage = add_list(voisinage,cases[a+4*rayon,b-4*rayon]) #2
+            voisinage = add_list(voisinage,cases[a,b-4*rayon]) #1
+        if b<600:
+            voisinage = add_list(voisinage,cases[a+4*rayon,b+4*rayon]) #8
+            voisinage = add_list(voisinage,cases[a,b+4*rayon])  #7
+    
+    epsilon = 10  #nombre de pixels représentant la distance entre 2 disques
+                  #tels qu'ils forment un amas
+    
+    
+    #On ajoute plusieurs fois le même à un ensemble -> pas grave
+    for i in voisinage:
+        xb,yb = l[i][0],l[i][1]
+        if sqrt((x-xb)**2+(y-yb)**2)<2*rayon+epsilon:
+            to_return.add(i)
+    return to_return
+    
+    
+
+def T(v):
+    """Fonction qui prend en argument un disque
+    Qui renvoie tous les disques en son contact direct ou non
+    (le contact du contact du contact ... est renvoyé)"""
+    to_return = {}    #renvoie le dictionnaire {indice du contact (0 -> direct / sinon -> plus ou moins direct) : set({disque})}  
+    Cv = set(C(v)) #Initialisation: contact direct de v
+    Tv = set(Cv)   #de même, contact direct de v
+    
+    #Cv: groupe de contact direct actuel
+    #Tv: ensemble de tous les contacts (in)directs déjà déterminés
+    i=0 #Indice de contact
+    while Cv != set(): #On ajoute les contacts des contacts de manière récursive
+        to_return[str(i)]=Cv #Groupe de contact à l'indice i
+        new_Cv = set() #Ensemble de groupe de contact d'indice  i+1
+        for j in Cv: #On regarde tout le groupe d'indice i
+            new_Cv= new_Cv.__or__(C(j).__sub__(Tv.__or__(set(j))))
+            #Et on ajoute les contacts directs de i à i+1 sauf ceux des k<=i
+        Tv = Tv.__or__(new_Cv) #On ajoute les nouveaux contacts à Tv
+        Cv = new_Cv #Et on réinitialise Cv pour l'itération suivante
+        i+=1 #ET on incrémente l'indice de contact
+    return to_return
+    
+
+for i in range(len(pos)):
+    x,y=pos[i][0],pos[i][1]
+    d=create_point(x,y,"black")
+    #create_mark(x,y,"black")
+    vmax=1
+    v=vmax
+    case = id_case(x,y)
+    a,b = case[0],case[1]
+    distance = sqrt((x-xt)**2+(y-yt)**2)
+    distances[str(i)]=distance
+    cases[a,b].append(str(len(l)))
+    moves[str(len(l))]=[x,y,d]
+    #Pour avoir des cibles en fonction du disque, on pourra crée une fonction
+    #qui à une case donnée (un couple) associe le point à atteindre (couple)
+    
+    
+    #x, y, vx, vy, rayon, vmax, temps, disque_canvas, x_to_reach, y_to_reach,
+    #v_contraintes_x,v_contraintes_y, case,distance_sortie
+    l[str(len(l))]=[x,y,0,0,rayon,vmax,0,d,xt,yt,0,0,case,distance]
+
+def scalaireAB_AD(xa,ya,xb,yb,xd,yd):
+        scal = (xb-xa)*(xd-xa)+(yb-ya)*(yd-ya)
+        return scal
+def projete(xV,yV,xB,yB,xA,yA):  #projeté de (xV,yV) sur la droite (xA,yA)-(xB,yB)
+    rapport = scalaireAB_AD(xB,yB,xA,yA,xV,yV)/scalaireAB_AD(xB,yB,xA,yA,xA,yA)
+    xH = rapport*(xA-xB) + xB
+    yH = rapport*(yA-yB) + yB
+    return [xH,yH]
+    
+
+def barycentre(L):
+    """Fonction qui prend en argument une liste d'indices de disques et
+    retourne le tuple (x,y) des coordonnées du barycentre
+    """
+    sum_x = sum([l[i][0] for i in L])
+    sum_y = sum([l[i][1] for i in L])
+    taille = len(L)
+    return (sum_x/taille,sum_y/taille)
+    
+
+def fct_cout(f_n,f_n1,G):
+    """
+    f_n est une liste de tuples de coordonnées
+    Fonction qui prend en argument une famille de coordonnées f_n1
+    (coordonnées sous la forme de tuples (x,y)) et le barycentre 
+    de l'amas après déplacement de ce barycentre
+    Retourne un float qui caractérise la qualité de la famille f_n1
+    float augmente <=> qualité augmente
+    """
+    try:
+        Gn_x = sum([i[0] for i in f_n])
+        Gn_y=sum([i[1] for i in f_n])
+        Gn1_x = G[0] #G est le barycentre déplacé de l'amas
+        Gn1_y=G[1]   #Correspond au point à atteindre au plus proche
+    except TypeError:
+        print(f_n,f_n1)
+    #On veut les résultats le:
+    dist_G = sum([(i[0]-Gn1_x)**2+(i[1]-Gn1_y)**2 for i in f_n1]) #Plus petit possible
+    dist_S = sum([(i[0]-xt)**2+(i[1]-yt)**2 for i in f_n1])  #Plus petit possible
+    d_Gn_Gn1 = (Gn_x-Gn1_x)**2+(Gn_y-Gn1_y)**2  #plus grand possible
+    try:
+        return d_Gn_Gn1/(dist_G*dist_S)
+    except ZeroDivisionError:
+        return 99999
+    
+    
+    
+def deplacement_possible(x,y,famille_n):
+    if x<100+rayon or x>1100-rayon or y<200+rayon or y>700-rayon:
+        return False
+    to_return = set()
+    try:
+        (a,b)=id_case(x,y)
+    except ValueError:
+        return False
+    voisinage = set(cases[a,b])
+    if a>100:
+        if b>200:
+            voisinage = add_list(voisinage,cases[a-4*rayon,b-4*rayon])
+            voisinage = add_list(voisinage,cases[a,b-4*rayon])
+        if b<600:
+            voisinage = add_list(voisinage,cases[a-4*rayon,b+4*rayon])
+            voisinage = add_list(voisinage,cases[a,b+4*rayon])
+    if a<1100-4*rayon:
+        voisinage = add_list(voisinage,cases[a+4*rayon,b])
+        if b>200:
+            voisinage = add_list(voisinage,cases[a+4*rayon,b-4*rayon])
+            voisinage = add_list(voisinage,cases[a,b-4*rayon])
+        if b<600:
+            voisinage = add_list(voisinage,cases[a+4*rayon,b+4*rayon])
+            voisinage = add_list(voisinage,cases[a,b+4*rayon])
+    for i in voisinage:
+        test=False
+        xb,yb = l[i][0],l[i][1]
+        create_mark(xb,yb,"blue")
+        if sqrt((x-xb)**2+(y-yb)**2)<2*rayon:
+            test=True
+            for j in famille_n:
+                for s in j:
+                    try:
+                        if sqrt((s[0]-xb)**2+(s[1]-yb)**2)<2*rayon:
+                            test=True
+                    except IndexError:
+                        pass
+        if test:
+            to_return.add(i)
+    return (to_return==set())    
+    
+    
+    
+class move(Thread):
+    def run(self):
+        changed = True
+        tour = 0
+        l_amas = []
+        while running:
+            while len(l)!=0 and changed and tour<100000:
+                """   LISTE VALEUR DU DICO DES DISQUES
+                #x, y, vx, vy, rayon, vmax, temps, disque_canvas, x_to_reach, y_to_reach,
+                #v_contraintes_x,v_contraintes_y, case,distance_sortie
+                l[str(len(l))]=[x,y,0,0,rayon,vmax,0,d,xt,yt,0,0,case,distance,vxc,vyc]            
+                """
+                liste_disques = [i for i in l.keys()]   #Liste des indices de tous les disques
+                changed = False
+                #Détermination des amas
+                
+                while liste_disques!=[]: #LE FOR I IN LISTE_DISQUES NE MARCHE PAS CAR LISTE MODIFIEE
+                    i=liste_disques[0]
+                    Tv = T(i) #On calcule le voisinage indirect de chaque disque, 1 par 1
+                    amas = []
+                    for j in Tv.values(): #Pour tous les disques de ce voisinage, on ajoute
+                        for k in j:       #ces disques à l'amas
+                            amas.append(k)
+                            try:
+                                liste_disques.remove(k) #On enlève les disques déjà dans des amas
+                                                        #Sinon on se retrouve avec plusieurs fois le même
+                            except ValueError:
+                                """create_mark(l[k][0],l[k][1],"red")
+                                print("i:",i,"Voisinage_i:",Tv,"k:",k,"\ndisques restants",liste_disques,
+                                      "\namas courant",amas,"\nAmas totaux",l_amas)"""
+                                pass
+                    l_amas.append(amas)  #On remplit l_amas des amas de chaque disque
+                    #print(amas,"\nrestants:",liste_disques,"\n")
+                    
+                for i in l_amas:                
+                    for j in i:
+                        canvas.create_line(l[j][0],l[j][1],
+                        l[i[0]][0],l[i[0]][1],width=1)
+                print(l_amas)
+                
+                
+                for i in l_amas:
+                    G = barycentre(i)                    
+                    xg,yg=G[0],G[1]
+                    create_mark(xg,yg,"red")
+                    #On calcule le mouvement du barycentre comme celui d'un gros disque
+                    #qui ne serait gêné par rien
+                    
+                    try:
+                        assert xt!=xg
+                        pente = (yt-yg)/(xt-xg)
+                    except AssertionError:
+                        pente = 0
+                    epsilon = 2  #dÃ©placement en pixel  (1 n'est pas forcÃ©ment le min)
+                    try:
+                        assert abs(pente) != 1
+                        delta_x = abs(epsilon/sqrt(1+pente**2))
+                    except AssertionError: #triangle rectangle de cotÃ© 1 1 sqrt(2)
+                        delta_x = 1
+                    if xg>xt:
+                        xi = xg-delta_x
+                    else:
+                        xi=xg+delta_x
+                    try:
+                        assert xt!=xg
+                        delta_y = abs((xi-xg)*(yt-yg)/(xt-xg))
+                    except AssertionError:
+                        delta_y = 1
+                    if yg>yt:
+                        yi = int(yg-delta_y)
+                    else:
+                        yi = int(yg+delta_y)
+                    
+                    
+                    #(xi,yi) = coordonnées du nouveau barycentre après
+                    #s'être déplacé vers la sortie (sans contrainte)
+                    y=10 #nombre d'itérations de calcul de k familles
+                    to_save = []
+                    to_keep=[]
+                    new_fam = [[(l[s][0],l[s][1]) for s in i]]
+                    for p in range(y): #Nombre d'étapes qu'on fait
+                        k = 30 #nombre de nouvelles corodonnées calculées pour chaque disque à chaque nouvelle famille pour chaque amas
+                        famille=[[] for i in range(k+3)]
+                        notes = []
+                        for s in new_fam:
+                            print("test")
+                            for c in range(k):
+                                for d in s:
+                                    xa,ya =d[0],d[1]
+                                    eps_x= randint(0,3)+1/randint(1,50) 
+                                    eps_y= randint(0,3)+1/randint(1,50)
+                                    x,y=xa+eps_x,ya+eps_y
+                                    attempts = 0
+                                    while not(deplacement_possible(x,y,famille)) and attempts<30:
+                                        eps_x= randint(0,4)
+                                        eps_y= randint(0,4)
+                                        x,y=x+eps_x,y+eps_y
+                                        attempts+=1
+                                    if attempts == 30:
+                                        famille[c].append((xa,ya))                                
+                                    else:
+                                        famille[c].append((x,y)) #On ajoute des nouvelles coordonnées
+                                    #pour le disque d'indice c
+                            if p==0:
+                                to_keep.append(famille[0])
+                                to_keep.append(famille[1])
+                                to_keep.append(famille[2])
+                            for j in famille:
+                                notes.append((fct_cout(s,j,(xi,yi)),j))
+                            for j in new_fam:
+                                notes.append((fct_cout(s,j,(xi,yi)),j))
+                            notes=sorted(notes,reverse=True) #Tri lexicographique, trie d'abord la fct_cout, ensuite l'indice i
+                            for j in range(4):
+                                to_save.append((notes[j][0],notes[j][1]))
+                        to_save=sorted(to_save,reverse=True)
+                        new_fam=[to_save[0][1],to_save[1][1],to_save[2][1],to_save[3][1]]
+                        new_fam.extend(to_keep)
+                    select = new_fam[randint(0,len(new_fam)-1)]
+                    new_fam=select
+                    index = 0
+                    for j in i:
+                        xo,yo=deepcopy(l[j][0]),deepcopy(l[j][1])
+                        l[j][0]=select[index][0]
+                        l[j][1]=select[index][1]
+                        x,y = l[j][0],l[j][1]
+                        index+=1
+                        canvas.coords(l[j][7],x-rayon,
+                                     y-rayon,x+rayon,y+rayon)
+                        create_mark(x,y,"green")
+                        print("MOVED")
+                        cases[id_case(xo,yo)].remove(j)
+                        cases[id_case(x,y)].append(j)
+                        #on met à jour les coordonnées dans le dictionnaire et sur l'affichage
+                        #Et on replace le disque à la bonne case du quadrillage
+                        if x!=xo or y!=yo:
+                            changed = True  #un disque bouge => la boucle continue
+                        else:
+                            print("stuck")
+                            create_mark(x,y,"black")
+                        if sqrt((x-xt)**2+(y-yt)**2)<5:   #on regarde si le disque
+                            #est proche de la sortie
+                            cases[id_case(xo,yo)].remove(j)
+                            canvas.coords(l[j][7],-200,-200,-200,-200)
+                            del l[j]
+                        
+                    tour+=1
+                        
+                            
+                    
+                        
+                        
+                            
+                    
+                    
+                    #On calcule k nouvelles listes de disques (équivalentes à new_fam[0])
+                    #qui "remplaceraient" i / new_fam[0] (de l_amas)
+                    #pour calculer k, on prend aléatoirement 2 epsilons
+                    #qu'on ajoute aux x et y des disques de l'amas
+                    #(pas le même epsilon, 2 pour chaque disque)
+                    #ON GARDE DE TOUTE FACON LES 5 PREMIERES FAMILLES
+                    #CALCULEES POUR CHAQUE AMAS
+                    #On définit une fonction de coût (juge la qualité de la famille calculée)
+                    #On garde les 5 premières calculées et les 5 ayant eu les meilleurs
+                    #résultats, en tout on en garde Z (Z entre 5 et 10)
+                    #on recommence avec ces Z familles,
+                    #on recalcule k familles pour chaque élément de Z
+                    #On garde les 5 premiers calculés et les 5 meilleurs par la fonction de coût
+                    #on a une famille Z' pour chaque élément de Z
+                    #mais maintenant on ne se soucie plus que de Z'
+                    #On recommence un certain nombre de fois
+                    #Au final, on prend une famille au hasard de Z''''''...'
+                    #et on effectue le déplacement
+                    
+                    """
+                    -Ne s'éloigne pas trop du barycentre
+                    -Elle se rapproche globalement vers la sortie
+                    -Elle a bougé depuis l'étape précédente
+                    """
+                
+                       
+                
+                l_amas = []
+            
+            
+
+
+move().start()
+
+fen.mainloop()
+running=False
+move()._stop()
