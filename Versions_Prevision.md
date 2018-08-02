@@ -3,21 +3,21 @@ NE SONT AFFICHÉES QUE LES MODIFICATIONS
 Alpha:
 	Tests avec 2 disques
   
-Beta:
-	Plus de 2 corps
-	Beta3:
-		Mise en place du quadrillage pour optimiser les calculs
-	Beta4:
-		Fonction qui détermine le voisinage indirect d'un disque donné
-		(Sert dans 1.0, mais est dans beta car pas de mouvement,
-		contient le mouvement de beta3 et cette fonction)
+Beta:  
+	Plus de 2 corps  
+	Beta3:  
+		Mise en place du quadrillage pour optimiser les calculs  
+	Beta4:  
+		Fonction qui détermine le voisinage indirect d'un disque donné  
+		(Sert dans 1.0, mais est dans beta car pas de mouvement,  
+		contient le mouvement de beta3 et cette fonction)  
 		
-0.x:
-	Début du TIPE
-	Version simple:
-		Calcul de la trajectoire voulue avec une équation de droite, puis 			
-    calcul des contraintes avec un projeté orthogonal sur les disques 			
-    voisins directs
+0.x:  
+	Début du TIPE  
+	Version simple:  
+		Calcul de la trajectoire voulue avec une équation de droite, puis   			
+    		calcul des contraintes avec un projeté orthogonal sur les disques   			
+    		voisins directs  
 1.x:
 	Prise en compte des voisins indirects (voisin du voisin du voisin...)
 	1.0:
