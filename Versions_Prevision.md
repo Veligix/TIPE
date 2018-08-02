@@ -1,11 +1,7 @@
 NE SONT AFFICHÉES QUE LES MODIFICATIONS
 
 Alpha:  
-
-.................
-$ ls *.sh
-$ mv *.sh ~/tmp
-.................
+   test
 
 
 +
